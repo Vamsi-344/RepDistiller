@@ -23,3 +23,7 @@
     ```
     python train_student.py --path_t ./save/models/resnet32x4_vanilla/ckpt_epoch_240.pth --distill crd --model_s resnet8x4 -a 1 -b 0.8 --trial 1     
     ```
+3. Run the code in background by the command:
+    ```
+    CUDA_VISIBLE_DEVICES=2 nohup python3 -u train_student.py --path_t ./res/ckpt-233.t7 --distill crd --model_s ShuffleV1 -a 0 -b 0.8 --kd_T 50 --trial 1 > crd.txt &
+    ```
