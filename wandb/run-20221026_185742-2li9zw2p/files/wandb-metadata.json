@@ -1,0 +1,33 @@
+{
+    "os": "Linux-5.4.0-52-generic-x86_64-with-glibc2.17",
+    "python": "3.8.12",
+    "heartbeatAt": "2022-10-26T18:57:44.020897",
+    "startedAt": "2022-10-26T18:57:42.696582",
+    "docker": null,
+    "gpu": "A100 Graphics Device",
+    "gpu_count": 8,
+    "cpu_count": 256,
+    "cuda": null,
+    "args": [
+        "--path_t",
+        "./res/wrn_40_2/ckpt-233.t7",
+        "--distill",
+        "crd",
+        "--model_s",
+        "ShuffleV1",
+        "-a",
+        "0",
+        "-b",
+        "0.8",
+        "--kd_T",
+        "50",
+        "--trial",
+        "1"
+    ],
+    "state": "running",
+    "program": "train_student.py",
+    "codePath": "train_student.py",
+    "host": "00001a9af7a7",
+    "username": "root",
+    "executable": "/opt/conda/bin/python3"
+}

@@ -9,7 +9,6 @@ import copy
 
 from .util import AverageMeter, accuracy
 
-
 def train_vanilla(epoch, train_loader, model, criterion, optimizer, opt):
     """vanilla training"""
     model.train()
@@ -185,6 +184,33 @@ def rand_bbox(size, lam):
 
     return bbx1, bby1, bbx2, bby2
 
+def cutmix_data(x, y, net_kd, net, beta=1., use_cuda=True):
+
+    lam = np.random.beta(beta, beta)
+
+    batch_size = x.size()[0]
+    if use_cuda:
+        index = torch.randperm(batch_size).cuda()
+    else:
+        index = torch.randperm(batch_size)
+
+    cutmix_x = copy.deepcopy(x)
+    bbx1, bby1, bbx2, bby2 = rand_bbox(cutmix_x.size(), lam)
+    cutmix_x[:, bbx1:bbx2, bby1:bby2] = x[index, :][:, bbx1:bbx2, bby1:bby2]
+    lam = 1-((bbx2 - bbx1)*(bby2 - bby1)/(cutmix_x.size()[-1]*cutmix_x.size()[-2]))
+
+    preact=False
+    feat_a_s, logit_a_s = net_kd(x.cuda(), is_feat=True, preact=preact)
+    with torch.no_grad():
+        feat_a_t, logit_a_t = net(x.cuda(), is_feat=True, preact=preact)
+    
+    feat_b_s, logit_b_s = net_kd(x[index,:].cuda(), is_feat=True, preact=preact)
+    with torch.no_grad():
+        feat_b_t, logit_b_t = net(x[index,:].cuda(), is_feat=True, preact=preact)
+
+    y_a_t, y_b_t = predictions(logit_a_t), predictions(logit_b_t)
+    return cutmix_x, y_a_t, y_b_t, logit_a_t, logit_b_t, logit_a_s, logit_b_s, lam
+
 def rkd_cutmix_data(x, y, net_kd, net, beta=1., use_cuda=True):
 
     lam = np.random.beta(beta, beta)
@@ -290,6 +316,15 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
                 input, targets_a, targets_b, logit_a_t, logit_b_t, logit_a_s, logit_b_s, lam = mixup_data(input, target, model_s, model_t)
             if opt.distill in ['mrkd']:
                 input, targets_a, targets_b, feat_a_t, feat_b_t, feat_a_s, feat_b_s, lam = rkd_mixup_data(input, target, model_s, model_t)
+            if opt.distill in ['cmkd']:
+                r = np.random.rand(1)
+                if r>0.5:
+                    flag=0
+                    with torch.no_grad():
+                        _, target = torch.max(model_t(input.cuda()),1)
+                else:
+                    flag=1
+                    input, targets_a, targets_b, logit_a_t, logit_b_t, logit_a_s, logit_b_s, lam = cutmix_data(input, target, model_s, model_t)
             if opt.distill in ['cmrkd']:
                 r = np.random.rand(1)
                 if r>0.5:
@@ -321,20 +356,20 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
         # cls + kl div
         if opt.distill in ['mcrd', 'mkd', 'mrkd']:
             loss_cls = mixup_criterion(criterion_cls, logit_s, targets_a, targets_b, lam)
-        elif opt.distill in ['cmrkd', 'cmcrd']:
+        elif opt.distill in ['cmrkd', 'cmcrd', 'cmkd']:
             if flag==1:
                 loss_cls = mixup_criterion(criterion_cls, logit_s, targets_a, targets_b, lam)
             else:
                 loss_cls = criterion_cls(logit_s, target)
         else:
             loss_cls = criterion_cls(logit_s, target)
-        if opt.distill in ['mkd']:
+        if opt.distill in ['mkd'] or (opt.distill == 'cmcrd' and flag==1):
             loss_div = criterion_div(logit_a_s, logit_a_t)+criterion_div(logit_b_s, logit_b_t)
         else:
             loss_div = criterion_div(logit_s, logit_t)
 
         # other kd beyond KL divergence
-        if opt.distill == 'kd' or opt.distill == 'mkd':
+        if opt.distill == 'kd' or opt.distill == 'mkd' or opt.distill=='cmkd':
             loss_kd = 0
         elif opt.distill == 'hint':
             f_s = module_list[1](feat_s[opt.hint_layer])

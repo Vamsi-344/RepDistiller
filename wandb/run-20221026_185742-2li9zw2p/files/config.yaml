@@ -1,0 +1,133 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.13.4
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    python_version: 3.8.12
+    start_time: 1666810662.701424
+    t:
+      1:
+      - 1
+      - 41
+      - 55
+      2:
+      - 1
+      - 41
+      - 55
+      3:
+      - 3
+      - 16
+      - 23
+      4: 3.8.12
+      5: 0.13.4
+      8:
+      - 5
+alpha:
+  desc: null
+  value: 0.0
+batch_size:
+  desc: null
+  value: 64
+beta:
+  desc: null
+  value: 0.8
+dataset:
+  desc: null
+  value: cifar100
+distill:
+  desc: null
+  value: crd
+epochs:
+  desc: null
+  value: 240
+feat_dim:
+  desc: null
+  value: 128
+gamma:
+  desc: null
+  value: 1
+hint_layer:
+  desc: null
+  value: 2
+init_epochs:
+  desc: null
+  value: 30
+kd_T:
+  desc: null
+  value: 50.0
+learning_rate:
+  desc: null
+  value: 0.01
+lr:
+  desc: null
+  value: 0.1
+lr_decay_epochs:
+  desc: null
+  value:
+  - 150
+  - 180
+  - 210
+lr_decay_rate:
+  desc: null
+  value: 0.1
+mode:
+  desc: null
+  value: exact
+model_name:
+  desc: null
+  value: S:ShuffleV1_T:wrn_40_2_cifar100_crd_r:1_a:0.0_b:0.8_1
+model_path:
+  desc: null
+  value: ./save_savg_true/student_model
+model_s:
+  desc: null
+  value: ShuffleV1
+model_t:
+  desc: null
+  value: wrn_40_2
+momentum:
+  desc: null
+  value: 0.9
+nce_k:
+  desc: null
+  value: 16384
+nce_m:
+  desc: null
+  value: 0.5
+nce_t:
+  desc: null
+  value: 0.07
+num_workers:
+  desc: null
+  value: 8
+path_t:
+  desc: null
+  value: ./res/wrn_40_2/ckpt-233.t7
+print_freq:
+  desc: null
+  value: 100
+save_folder:
+  desc: null
+  value: ./save_savg_true/student_model/S:ShuffleV1_T:wrn_40_2_cifar100_crd_r:1_a:0.0_b:0.8_1
+save_freq:
+  desc: null
+  value: 40
+tb_folder:
+  desc: null
+  value: ./save_savg_true/student_tensorboards/S:ShuffleV1_T:wrn_40_2_cifar100_crd_r:1_a:0.0_b:0.8_1
+tb_freq:
+  desc: null
+  value: 500
+tb_path:
+  desc: null
+  value: ./save_savg_true/student_tensorboards
+trial:
+  desc: null
+  value: '1'
+weight_decay:
+  desc: null
+  value: 0.0005

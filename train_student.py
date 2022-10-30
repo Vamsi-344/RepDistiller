@@ -31,10 +31,10 @@ from crd.criterion import CRDLoss
 from helper.loops import train_distill as train, validate
 from helper.pretrain import init
 
-import wandb
-wandb.login()
+# import wandb
+# wandb.login()
 
-wandb.init(project="wrn_shufflenet_cifar100", config={"lr":0.1})
+# wandb.init(project="cifar100", config={"lr":0.1})
 
 def parse_option():
 
@@ -69,8 +69,8 @@ def parse_option():
     parser.add_argument('--path_t', type=str, default=None, help='teacher model snapshot')
 
     # distillation
-    parser.add_argument('--distill', type=str, default='kd', choices=['kd', 'mkd', 'mcrd', 'cmcrd', 'hint', 'attention', 'similarity',
-                                                                      'correlation', 'vid', 'crd', 'kdsvd', 'fsp',
+    parser.add_argument('--distill', type=str, default='kd', choices=['kd', 'mkd', 'cmkd', 'hint', 'attention', 'similarity',
+                                                                      'correlation', 'vid', 'crd', 'mcrd', 'cmcrd', 'kdsvd', 'fsp',
                                                                       'rkd', 'mrkd', 'cmrkd', 'pkt', 'abound', 'factor', 'nst'])
     parser.add_argument('--trial', type=str, default='1', help='trial id')
 
@@ -79,6 +79,7 @@ def parse_option():
     parser.add_argument('-b', '--beta', type=float, default=None, help='weight balance for other losses')
 
     # KL distillation
+    parser.add_argument('--kd_reduction', type=str, default='batchmean', help='reduction method for KD distillation')
     parser.add_argument('--kd_T', type=float, default=4, help='temperature for KD distillation')
 
     # NCE distillation
@@ -110,10 +111,10 @@ def parse_option():
     for it in iterations:
         opt.lr_decay_epochs.append(int(it))
 
-    opt.model_t = 'wrn_40_2'#get_teacher_name(opt.path_t)
+    opt.model_t = get_teacher_name(opt.path_t)
 
-    opt.model_name = 'S:{}_T:{}_{}_{}_r:{}_a:{}_b:{}_{}'.format(opt.model_s, opt.model_t, opt.dataset, opt.distill,
-                                                                opt.gamma, opt.alpha, opt.beta, opt.trial)
+    opt.model_name = 'S:{}_T:{}_{}_{}_r:{}_a:{}_b:{}_{}kl:{}'.format(opt.model_s, opt.model_t, opt.dataset, opt.distill,
+                                                                opt.gamma, opt.alpha, opt.beta, opt.trial, opt.kd_reduction)
 
     opt.tb_folder = os.path.join(opt.tb_path, opt.model_name)
     if not os.path.isdir(opt.tb_folder):
@@ -137,13 +138,15 @@ def get_teacher_name(model_path):
 
 def load_teacher(model_path, n_cls):
     print('==> loading teacher model')
-    #model_t = get_teacher_name(model_path)
+    # model_t = get_teacher_name(model_path)
     model = torch.load(model_path, map_location='cpu')['net']
-    #model = model_dict['wrn_40_2'](num_classes=n_cls)
-    #model.load_state_dict(torch.load(model_path)['net'])
+    # model = model_dict[model_t](num_classes=n_cls)
+    # model.load_state_dict(torch.load(model_path, map_location='cpu')['net'])
     print('==> done')
     return model
 
+# wandb.run.name = opt.model_name
+# wandb.run.save()
 
 def main():
     best_acc = 0
@@ -153,7 +156,7 @@ def main():
     # tensorboard logger
     logger = tb_logger.Logger(logdir=opt.tb_folder, flush_secs=2)
 
-    wandb.config.update(opt)
+    # wandb.config.update(opt)
 
     # dataloader
     if opt.dataset == 'cifar100':
@@ -186,9 +189,9 @@ def main():
     trainable_list.append(model_s)
 
     criterion_cls = nn.CrossEntropyLoss()
-    criterion_div = DistillKL(opt.kd_T)
-    if opt.distill == 'kd' or opt.distill == 'mkd':
-        criterion_kd = DistillKL(opt.kd_T)
+    criterion_div = DistillKL(opt.kd_T, opt.kd_reduction)
+    if opt.distill == 'kd' or opt.distill == 'mkd' or opt.distill == 'cmkd':
+        criterion_kd = DistillKL(opt.kd_T, opt.kd_reduction)
     elif opt.distill == 'hint':
         criterion_kd = HintLoss()
         regress_s = ConvReg(feat_s[opt.hint_layer].shape, feat_t[opt.hint_layer].shape)
@@ -297,15 +300,15 @@ def main():
     print('teacher ece: ', ece)
     print('teacher oe: ', oe)
 
-    columns = ["train Acc@1", "train Acc@5", "train loss", "val Acc@1", "val Acc@5", "val ECE", "val OE", "val loss"]
-    log_table = wandb.Table(columns=columns)
+    # columns = ["train Acc@1", "train Acc@5", "train loss", "val Acc@1", "val Acc@5", "val ECE", "val OE", "val loss"]
+    # log_table = wandb.Table(columns=columns)
 
     # routine
     for epoch in range(1, opt.epochs + 1):
 
         # adjust_learning_rate(epoch, opt, optimizer)
         print("==> training...")
-        log_table = wandb.Table(columns=log_table.columns, data=log_table.data)
+        # log_table = wandb.Table(columns=log_table.columns, data=log_table.data)
 
         time1 = time.time()
         train_acc, train_acc_top5, train_loss = train(epoch, train_loader, module_list, criterion_list, optimizer, opt)
@@ -318,9 +321,9 @@ def main():
 
         test_acc, tect_acc_top5, test_loss, ece, oe = validate(val_loader, model_s, criterion_cls, opt, 100)
 
-        wandb.log({"train Acc@1": train_acc, "train Acc@5": train_acc_top5, "train loss": train_loss, "val Acc@1": test_acc, "val Acc@5": tect_acc_top5, "val ECE": ece, "val OE": oe, "val loss": test_loss}, commit=False)
-        log_table.add_data(train_acc, train_acc_top5, train_loss, test_acc, tect_acc_top5, test_loss, ece, oe)
-        wandb.log({"table": log_table, 'epoch': epoch})
+        # wandb.log({"train Acc@1": train_acc, "train Acc@5": train_acc_top5, "train loss": train_loss, "val Acc@1": test_acc, "val Acc@5": tect_acc_top5, "val ECE": ece, "val OE": oe, "val loss": test_loss}, commit=False)
+        # log_table.add_data(train_acc, train_acc_top5, train_loss, test_acc, tect_acc_top5, test_loss, ece, oe)
+        # wandb.log({"table": log_table, 'epoch': epoch})
 
         logger.log_value('test_acc', test_acc, epoch)
         logger.log_value('test_loss', test_loss, epoch)
@@ -337,7 +340,7 @@ def main():
             save_file = os.path.join(opt.save_folder, '{}_best.pth'.format(opt.model_s))
             print('saving the best model!')
             torch.save(state, save_file)
-            wandb.save(save_file)
+            # wandb.save(save_file)
 
         # regular saving
         if epoch % opt.save_freq == 0:
@@ -361,7 +364,7 @@ def main():
     }
     save_file = os.path.join(opt.save_folder, '{}_last.pth'.format(opt.model_s))
     torch.save(state, save_file)
-    wandb.finish
+    # wandb.finish
 
 
 if __name__ == '__main__':
