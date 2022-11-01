@@ -323,28 +323,6 @@ def cutout_data(x, y, net_kd, net, use_cuda=True):
 
     return cutout_x, y_a_t, logit_a_t, logit_a_s
     
-
-
-# class CutoutDataset(Dataset):
-#     """Cutout dataset."""
-
-#     def __init__(self, dataset):
-#         self.dataset = dataset
-
-#     def __len__(self):
-#         return len(self.dataset)
-
-#     def __getitem__(self, idx):
-#         if torch.is_tensor(idx):
-#             idx = idx.tolist()
-
-#         img = self.dataset[idx][0]
-#         t_label = self.dataset[idx][1]
-#         img = Cutout(n_holes=1, length=8)(img)
-#         sample = {'image': img, 't_label': t_label}
-
-#         return sample['image'], sample['t_label']
-
 def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, opt):
     """One epoch distillation"""
     # set modules as train()
@@ -443,7 +421,7 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
                 loss_cls = criterion_cls(logit_s, target)
         else:
             loss_cls = criterion_cls(logit_s, target)
-        if opt.distill in ['mkd'] or (opt.distill == 'cmcrd' and flag==1):
+        if opt.distill in ['mkd'] or (opt.distill == 'cmkd' and flag==1):
             loss_div = criterion_div(logit_a_s, logit_a_t)+criterion_div(logit_b_s, logit_b_t)
         elif opt.distill in ['cokd']:
             loss_div = criterion_div(logit_a_s, logit_a_t)
@@ -534,11 +512,8 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
             loss_kd = criterion_kd(factor_s, factor_t)
         else:
             raise NotImplementedError(opt.distill)
-
-        if opt.distill in ['cmcrd', 'cmrkd']:
-            loss = opt.gamma * loss_cls + opt.beta * loss_kd
-        else:
-            loss = opt.gamma * loss_cls + opt.alpha * loss_div + opt.beta * loss_kd
+            
+        loss = opt.gamma * loss_cls + opt.alpha * loss_div + opt.beta * loss_kd
 
         acc1, acc5 = accuracy(logit_s, target, topk=(1, 5))
         losses.update(loss.item(), input.size(0))
