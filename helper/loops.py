@@ -267,6 +267,84 @@ def crd_cutmix_data(x, y, indices, contrast_indices, net_kd, net, beta=1., use_c
     con_index_a_t, con_index_b_t = contrast_indices, contrast_indices[index]
     return cutmix_x, y_a_t, y_b_t, index_a_t, index_b_t, con_index_a_t, con_index_b_t, feat_a_t, feat_b_t, feat_a_s, feat_b_s, lam
 
+class Cutout(object):
+    """Randomly mask out one or more patches from an image.
+
+    Args:
+        n_holes (int): Number of patches to cut out of each image.
+        length (int): The length (in pixels) of each square patch.
+    """
+    def __init__(self, n_holes, length):
+        self.n_holes = n_holes
+        self.length = length
+
+    def __call__(self, img):
+        """
+        Args:
+            img (Tensor): Tensor image of size (C, H, W).
+        Returns:
+            Tensor: Image with n_holes of dimension length x length cut out of it.
+        """
+        h = img.size(1)
+        w = img.size(2)
+
+        mask = np.ones((h, w), np.float32)
+
+        for n in range(self.n_holes):
+            y = np.random.randint(h)
+            x = np.random.randint(w)
+
+            y1 = np.clip(y - self.length // 2, 0, h)
+            y2 = np.clip(y + self.length // 2, 0, h)
+            x1 = np.clip(x - self.length // 2, 0, w)
+            x2 = np.clip(x + self.length // 2, 0, w)
+
+            mask[y1: y2, x1: x2] = 0.
+
+        mask = torch.from_numpy(mask)
+        mask = mask.expand_as(img)
+        img = img * mask
+
+        return img
+
+def cutout_data(x, y, net_kd, net, use_cuda=True):
+    
+    batch_size = x.size()[0]
+
+    cutout_x = copy.deepcopy(x)
+    cutout_x = Cutout(n_holes=1, length=8)(cutout_x)
+
+    preact = False
+    feat_a_s, logit_a_s = net_kd(x.cuda(), is_feat=True, preact=preact)
+    with torch.no_grad():
+        feat_a_t, logit_a_t = net(x.cuda(), is_feat=True, preact=preact)
+    
+    y_a_t = predictions(logit_a_t)
+
+    return cutout_x, y_a_t, logit_a_t, logit_a_s
+    
+
+
+# class CutoutDataset(Dataset):
+#     """Cutout dataset."""
+
+#     def __init__(self, dataset):
+#         self.dataset = dataset
+
+#     def __len__(self):
+#         return len(self.dataset)
+
+#     def __getitem__(self, idx):
+#         if torch.is_tensor(idx):
+#             idx = idx.tolist()
+
+#         img = self.dataset[idx][0]
+#         t_label = self.dataset[idx][1]
+#         img = Cutout(n_holes=1, length=8)(img)
+#         sample = {'image': img, 't_label': t_label}
+
+#         return sample['image'], sample['t_label']
+
 def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, opt):
     """One epoch distillation"""
     # set modules as train()
@@ -316,6 +394,8 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
                 input, targets_a, targets_b, logit_a_t, logit_b_t, logit_a_s, logit_b_s, lam = mixup_data(input, target, model_s, model_t)
             if opt.distill in ['mrkd']:
                 input, targets_a, targets_b, feat_a_t, feat_b_t, feat_a_s, feat_b_s, lam = rkd_mixup_data(input, target, model_s, model_t)
+            if opt.distill in ['cokd']:
+                input, target, logit_a_t, logit_a_s = cutout_data(input, target, model_s, model_t)
             if opt.distill in ['cmkd']:
                 r = np.random.rand(1)
                 if r>0.5:
@@ -365,11 +445,13 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
             loss_cls = criterion_cls(logit_s, target)
         if opt.distill in ['mkd'] or (opt.distill == 'cmcrd' and flag==1):
             loss_div = criterion_div(logit_a_s, logit_a_t)+criterion_div(logit_b_s, logit_b_t)
+        elif opt.distill in ['cokd']:
+            loss_div = criterion_div(logit_a_s, logit_a_t)
         else:
             loss_div = criterion_div(logit_s, logit_t)
 
         # other kd beyond KL divergence
-        if opt.distill == 'kd' or opt.distill == 'mkd' or opt.distill=='cmkd':
+        if opt.distill == 'kd' or opt.distill == 'mkd' or opt.distill=='cmkd' or opt.distill=='cokd':
             loss_kd = 0
         elif opt.distill == 'hint':
             f_s = module_list[1](feat_s[opt.hint_layer])

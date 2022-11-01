@@ -69,7 +69,7 @@ def parse_option():
     parser.add_argument('--path_t', type=str, default=None, help='teacher model snapshot')
 
     # distillation
-    parser.add_argument('--distill', type=str, default='kd', choices=['kd', 'mkd', 'cmkd', 'hint', 'attention', 'similarity',
+    parser.add_argument('--distill', type=str, default='kd', choices=['kd', 'mkd', 'cmkd', 'cokd', 'hint', 'attention', 'similarity',
                                                                       'correlation', 'vid', 'crd', 'mcrd', 'cmcrd', 'kdsvd', 'fsp',
                                                                       'rkd', 'mrkd', 'cmrkd', 'pkt', 'abound', 'factor', 'nst'])
     parser.add_argument('--trial', type=str, default='1', help='trial id')
@@ -190,7 +190,7 @@ def main():
 
     criterion_cls = nn.CrossEntropyLoss()
     criterion_div = DistillKL(opt.kd_T, opt.kd_reduction)
-    if opt.distill == 'kd' or opt.distill == 'mkd' or opt.distill == 'cmkd':
+    if opt.distill == 'kd' or opt.distill == 'mkd' or opt.distill == 'cmkd' or opt.distill == 'cokd':
         criterion_kd = DistillKL(opt.kd_T, opt.kd_reduction)
     elif opt.distill == 'hint':
         criterion_kd = HintLoss()
